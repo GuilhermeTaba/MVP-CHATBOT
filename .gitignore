@@ -1,0 +1,15 @@
+
+.wwebjs_auth/
+node_modules/
+dist/
+build/
+.env
+.env.local
+.env.*.local
+*.log
+logs/
+.tmp/
+.cache/
+.vscode/
+.idea/
+.DS_Store
