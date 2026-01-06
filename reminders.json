@@ -1,0 +1,18 @@
+[
+  {
+    "id": "rem-1767662256491",
+    "chatId": "157071366443261@lid",
+    "produto": "iogurte",
+    "validade": "2026-01-12",
+    "diasAntes": 2,
+    "createdAt": "2026-01-06T01:17:36.491Z"
+  },
+  {
+    "id": "rem-1767662506360",
+    "chatId": "157071366443261@lid",
+    "produto": "iogurte",
+    "validade": "2026-01-12",
+    "diasAntes": 2,
+    "createdAt": "2026-01-06T01:21:46.360Z"
+  }
+]

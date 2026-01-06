@@ -26,10 +26,18 @@ type ParsedReminder = {
 const sessions = new Map<string, Session>();
 let clientRef: Client;
 
-function log(chatId: string, text: string) {
-  // Mantenha console.log durante desenvolvimento. Se quiser enviar pelo WhatsApp,
-  // troque por: await clientRef.sendMessage(chatId, text);
-  console.log(`[CHAT ${chatId}] ${text}`);
+async function log(chatId: string, text: string) {
+  const chat = await clientRef.getChatById(chatId);
+
+  // mostra "digitando..."
+  await chat.sendStateTyping();
+
+  await new Promise(r => setTimeout(r, 800));
+
+  await clientRef.sendMessage(chatId, text);
+
+  // remove estado de digitação
+  await chat.clearState();
 }
 
 /**

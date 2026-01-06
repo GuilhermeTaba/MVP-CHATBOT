@@ -1,16 +1,19 @@
 // main.ts
+
+import dotenv from "dotenv";
+dotenv.config();
 import { Client, LocalAuth } from 'whatsapp-web.js';
 import qrcode from 'qrcode-terminal';
 import { attachConversationFlow } from './conversation-flow';
-import dotenv from "dotenv";
-dotenv.config();
+import { startScheduling, attachWhatsAppClient } from "./reminders"; // <- importado
+
 
 
 // Cria o cliente com LocalAuth para salvar sessão automaticamente
 const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
-    headless: true, // mude para false para depurar com interface do Chromium
+    headless: true,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -18,7 +21,6 @@ const client = new Client({
       '--single-process'
     ]
   },
-  // se o TypeScript reclamar, o cast as any já resolve
   webVersionCache: { type: 'none' } as any
 });
 
@@ -28,28 +30,36 @@ client.on('qr', (qr: string) => {
   qrcode.generate(qr, { small: true });
 });
 
-// Auth OK
 client.on('authenticated', () => {
   console.log('Authenticated — sessão salva.');
 });
 
-// Auth falhou
 client.on('auth_failure', (msg) => {
   console.error('Falha na autenticação:', msg);
 });
 
-// Ready
-client.on('ready', () => {
+client.on('ready', async () => {
   console.log('WhatsApp pronto (ready).');
+
+  // 1) anexa o client para que reminders.ts possa enviar mensagens
+  attachWhatsAppClient(client);
+
+  // 2) inicia o agendamento (carrega do Mongo e agenda todos os reminders)
+  try {
+    await startScheduling();
+    console.log("[MAIN] startScheduling completo.");
+  } catch (err) {
+    console.error("[MAIN] Erro ao iniciar agendamento:", err);
+  }
+
+  // 3) anexa fluxo de conversa (seu handler de mensagens)
   attachConversationFlow(client);
 });
 
-// Disconnected
 client.on('disconnected', (reason) => {
   console.log('Desconectado:', reason);
 });
 
-// Erros do client
 client.on('error', (err) => {
   console.error('Erro do client:', err);
 });
@@ -57,3 +67,10 @@ client.on('error', (err) => {
 // NÃO registre outro client.on('message') aqui — o conversation-flow já faz isso.
 
 client.initialize();
+
+// opcional: fechar mongo ao encerrar o processo
+process.on("SIGINT", async () => {
+  console.log("SIGINT recebido — fechando...");
+  // se quiser, importe closeMongo e chamar aqui
+  process.exit(0);
+});
