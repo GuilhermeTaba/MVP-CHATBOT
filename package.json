@@ -4,7 +4,6 @@
   "description": "��#\u0000 \u0000M\u0000V\u0000P\u0000-\u0000C\u0000H\u0000A\u0000T\u0000B\u0000O\u0000T\u0000\r\u0000 \u0000",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon",
     "build": "tsc",
     "start": "node build/index.js"
   },
