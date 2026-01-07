@@ -27,6 +27,33 @@ let clientRef: Client | null = null;
 /** Idempotência: garante que attachConversationFlow só registre handlers uma vez */
 let _conversationAttached = false;
 
+/** dedupe de envios: previne mensagens idênticas para o mesmo chat em curto prazo */
+const recentSends = new Map<string, { text: string; ts: number }>();
+const DEDUPE_WINDOW_MS = 8000;
+
+function isDuplicateSend(chatId: string, text: string): boolean {
+  const key = String(chatId);
+  const now = Date.now();
+  const rec = recentSends.get(key);
+  if (!rec) {
+    recentSends.set(key, { text, ts: now });
+    setTimeout(() => {
+      const cur = recentSends.get(key);
+      if (cur && cur.ts === now) recentSends.delete(key);
+    }, DEDUPE_WINDOW_MS + 100);
+    return false;
+  }
+  if (rec.text === text && now - rec.ts < DEDUPE_WINDOW_MS) {
+    return true;
+  }
+  recentSends.set(key, { text, ts: now });
+  setTimeout(() => {
+    const cur = recentSends.get(key);
+    if (cur && cur.ts === now) recentSends.delete(key);
+  }, DEDUPE_WINDOW_MS + 100);
+  return false;
+}
+
 function formatDateBR(dateISO: string | null | undefined): string | null {
   if (!dateISO) return null;
   const match = dateISO.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -64,6 +91,19 @@ async function safeSendMessage(chatId: string, text: string): Promise<boolean> {
   }
 }
 
+async function safeSendWithDedupe(chatId: string, text: string): Promise<boolean> {
+  try {
+    if (isDuplicateSend(chatId, text)) {
+      console.log('[conversation-flow] duplicado detectado — ignorando envio', { chatId, snippet: text.slice(0, 80) });
+      return false;
+    }
+    return await safeSendMessage(chatId, text);
+  } catch (err) {
+    console.error('[conversation-flow] safeSendWithDedupe erro', err);
+    return false;
+  }
+}
+
 async function safeSendStateTyping(chat: any): Promise<void> {
   if (!chat || typeof chat.sendStateTyping !== "function") return;
   try {
@@ -82,18 +122,17 @@ async function safeClearState(chat: any): Promise<void> {
   }
 }
 
-/** substitui o antigo log(...) — não lança */
+/** substitui o antigo log(...) — não lança e usa dedupe */
 async function safeLog(chatId: string, text: string) {
   try {
     const chat = await safeGetChatById(chatId);
     if (chat) {
       await safeSendStateTyping(chat);
       await new Promise((r) => setTimeout(r, 800));
-      await safeSendMessage(chatId, text);
+      await safeSendWithDedupe(chatId, text);
       await safeClearState(chat);
     } else {
-      // fallback: tenta enviar direto mesmo sem chat
-      await safeSendMessage(chatId, text);
+      await safeSendWithDedupe(chatId, text);
     }
   } catch (err: any) {
     console.error("[conversation-flow] safeLog erro inesperado", { chatId, err: err?.message ?? err });
