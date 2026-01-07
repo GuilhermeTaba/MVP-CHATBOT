@@ -24,6 +24,9 @@ type ParsedReminder = {
 const sessions = new Map<string, Session>();
 let clientRef: Client | null = null;
 
+/** Idempotência: garante que attachConversationFlow só registre handlers uma vez */
+let _conversationAttached = false;
+
 function formatDateBR(dateISO: string | null | undefined): string | null {
   if (!dateISO) return null;
   const match = dateISO.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -89,7 +92,7 @@ async function safeLog(chatId: string, text: string) {
       await safeSendMessage(chatId, text);
       await safeClearState(chat);
     } else {
-      // se não conseguiu o chat, tenta enviar mensagem diretamente (algumas versões aceitam)
+      // fallback: tenta enviar direto mesmo sem chat
       await safeSendMessage(chatId, text);
     }
   } catch (err: any) {
@@ -97,7 +100,7 @@ async function safeLog(chatId: string, text: string) {
   }
 }
 
-/** Mescla o resultado do parser no draft, sem sobrescrever campos já preenchidos e sem aceitar null/undefined. */
+/** Mescla o resultado do parser no draft, sem sobrescrever campos já preenchidos */
 function mergeParsedIntoDraft(session: Session, parsed: ParsedReminder | null): string[] {
   if (!parsed) return [];
   const filled: string[] = [];
@@ -167,12 +170,21 @@ function getNextPrompt(session: Session): { state: State; message: string } {
   };
 }
 
-/** Attach conversation flow safely */
+/** Attach conversation flow de forma idempotente e segura */
 export function attachConversationFlow(client: Client) {
+  if (_conversationAttached) {
+    console.log('[conversation-flow] já anexado — ignorando nova chamada.');
+    return;
+  }
+  _conversationAttached = true;
+
   clientRef = client;
 
   client.on("message", async (message: Message) => {
     try {
+      // log curto para depurar duplicatas (mesma message.id aparece duas vezes se duplicado)
+      console.log('[conversation-flow] handler message firing', { pid: process.pid, from: message.from, id: message.id?.id ?? message.id });
+
       const chatId = message.from;
       const text = (message.body || "").trim();
 
