@@ -38,6 +38,9 @@ let client!: Client;
 /** Controle para garantir que o scheduler só inicia uma vez por processo */
 let schedulerStarted = false;
 
+/** Flag para evitar destruir/encerrar duas vezes */
+let shuttingDown = false;
+
 /** Conexão única com Mongo */
 async function ensureMongoConnected(): Promise<void> {
   if (mongoose.connection.readyState === 1) {
@@ -64,7 +67,7 @@ async function ensureMongoConnected(): Promise<void> {
       authStrategy: new RemoteAuth({
         store,
         clientId: 'default',
-        backupSyncIntervalMs: 60_000, // pode manter
+        backupSyncIntervalMs: 60_000,
       }),
       puppeteer: {
         headless: true,
@@ -72,7 +75,7 @@ async function ensureMongoConnected(): Promise<void> {
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
-          '--single-process',
+          // '--single-process', // opcional: experimente remover se estiver tendo crashes do Chromium
           '--disable-gpu',
         ],
       },
@@ -80,7 +83,6 @@ async function ensureMongoConnected(): Promise<void> {
     });
 
     // ===== Eventos =====
-
     client.on('qr', (qr: string) => {
       console.log('--- QR gerado. Escaneie com seu WhatsApp ---');
       qrcode.generate(qr, { small: true });
@@ -108,7 +110,7 @@ async function ensureMongoConnected(): Promise<void> {
           console.log("[MAIN] startScheduling completo.");
         } catch (err) {
           console.error("[MAIN] Erro ao iniciar agendamento:", err);
-          // Se quiser permitir nova tentativa dentro do mesmo processo:
+          // se quiser permitir retry no mesmo processo:
           // schedulerStarted = false;
         }
       } else {
@@ -116,7 +118,11 @@ async function ensureMongoConnected(): Promise<void> {
       }
 
       // Inicia fluxo de conversa
-      attachConversationFlow(client);
+      try {
+        attachConversationFlow(client);
+      } catch (err) {
+        console.error('[MAIN] erro attachConversationFlow:', err);
+      }
     });
 
     client.on('disconnected', (reason) => {
@@ -138,6 +144,12 @@ async function ensureMongoConnected(): Promise<void> {
 
 // ===== Shutdown gracioso =====
 async function gracefulShutdown(signal?: string) {
+  if (shuttingDown) {
+    console.log('[SHUTDOWN] já em andamento, ignorando nova chamada.');
+    return;
+  }
+  shuttingDown = true;
+
   try {
     console.log(`${signal ?? 'SIGINT'} recebido — finalizando...`);
 
@@ -159,13 +171,24 @@ async function gracefulShutdown(signal?: string) {
       }
     }
   } finally {
-    process.exit(0);
+    // delay curto pra garantir logs flush
+    setTimeout(() => process.exit(0), 200);
   }
 }
 
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('uncaughtException', async (err) => {
-  console.error('Uncaught Exception:', err);
-  await gracefulShutdown('uncaughtException');
+// Captura Promise rejections não tratadas
+process.on('unhandledRejection', (reason, p) => {
+  console.error('[unhandledRejection] motivo:', reason);
+  // opcional: decide se quer encerrar. Por segurança, apenas logamos.
+  // Se você preferir encerrar para evitar estado corrupto, chame gracefulShutdown('unhandledRejection')
 });
+
+// Captura exceções não tratadas — faz somente uma vez o gracefulShutdown
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  // tente um graceful shutdown, mas não aguarde indefinidamente aqui
+  void gracefulShutdown('uncaughtException');
+});
+
+process.on('SIGINT', () => void gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => void gracefulShutdown('SIGTERM'));
