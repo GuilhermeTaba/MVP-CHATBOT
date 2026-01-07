@@ -122,15 +122,13 @@ export async function scheduleReminder(reminder: Reminder) {
 
   schedule.scheduleJob(reminder.id, notifyDate, async () => {
     const text = `⏰ Lembrete: *${reminder.produto}* vence em ${reminder.validade}`;
-    console.log(
-      `[REMINDER] Disparando ${reminder.id} para ${reminder.chatId} em ${notifyDate.toISOString()}`
-    );
+
 
     try {
       if (whatsappClient) {
         // chatId deve estar no formato aceito por whatsapp-web.js (ex: '5511999999999@c.us')
         await whatsappClient.sendMessage(reminder.chatId, text);
-        console.log(`[REMINDER] Mensagem enviada via WhatsApp para ${reminder.chatId}`);
+
       } else {
         console.log(`[REMINDER] whatsappClient não anexado. Mensagem: ${text}`);
       }
@@ -147,7 +145,6 @@ export async function scheduleReminder(reminder: Reminder) {
     }
   });
 
-  console.log(`[SCHEDULE] Agendado ${reminder.id} para ${notifyDate.toISOString()}`);
 }
 
 /* =========================

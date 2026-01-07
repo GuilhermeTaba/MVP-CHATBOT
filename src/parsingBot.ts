@@ -19,6 +19,7 @@ const SYSTEM_PROMPT =
   ' Use YYYY-MM-DD quando possível; ao inferir ano, escolha o próximo ano possível no timezone America/Sao_Paulo.' +
   ' Aceite datas em pt-BR (ex.: 25/01, 25/01/26, 25 de janeiro).' +
   ' Se não houver informação suficiente para um campo, retorne null.' +
+  'Se for so um numero é diasAntes'+
   ' NÃO acrescente texto explicativo, comentários ou markdown — somente um objeto JSON.';
 
 /* ===================== Helpers ===================== */
