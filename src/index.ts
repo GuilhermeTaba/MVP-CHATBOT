@@ -2,6 +2,22 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+import { v4 as uuidv4 } from 'uuid';
+export const INSTANCE_ID = process.env.INSTANCE_ID || uuidv4();
+
+// BOOT log — identifica processo/instância
+console.log('[BOOT]', {
+  time: new Date().toISOString(),
+  pid: process.pid,
+  instanceId: INSTANCE_ID,
+  env: {
+    RAILWAY_ENV: process.env.RAILWAY_ENV,
+    RAILWAY_DEPLOYMENT_ID: process.env.RAILWAY_DEPLOYMENT_ID,
+    RAILWAY_REGION: process.env.RAILWAY_REGION,
+    NODE_ENV: process.env.NODE_ENV,
+  }
+});
+
 import { Client, RemoteAuth } from 'whatsapp-web.js';
 import qrcode from 'qrcode-terminal';
 import mongoose from 'mongoose';
@@ -18,6 +34,9 @@ if (!mongoUri) {
 
 // Client WhatsApp (definite assignment)
 let client!: Client;
+
+/** Controle para garantir que o scheduler só inicia uma vez por processo */
+let schedulerStarted = false;
 
 /** Conexão única com Mongo */
 async function ensureMongoConnected(): Promise<void> {
@@ -81,12 +100,19 @@ async function ensureMongoConnected(): Promise<void> {
       // Disponibiliza client para reminders
       attachWhatsAppClient(client);
 
-      // Inicia agendamentos
-      try {
-        await startScheduling();
-        console.log("[MAIN] startScheduling completo.");
-      } catch (err) {
-        console.error("[MAIN] Erro ao iniciar agendamento:", err);
+      // Inicia agendamentos — protegido para executar apenas uma vez por processo
+      if (!schedulerStarted) {
+        schedulerStarted = true;
+        try {
+          await startScheduling();
+          console.log("[MAIN] startScheduling completo.");
+        } catch (err) {
+          console.error("[MAIN] Erro ao iniciar agendamento:", err);
+          // Se quiser permitir nova tentativa dentro do mesmo processo:
+          // schedulerStarted = false;
+        }
+      } else {
+        console.log('[MAIN] ready disparou novamente — scheduler ignorado.');
       }
 
       // Inicia fluxo de conversa
