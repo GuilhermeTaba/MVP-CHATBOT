@@ -10,7 +10,7 @@ import { attachConversationFlow } from './conversation-flow';
 import { startScheduling, attachWhatsAppClient } from "./reminders";
 
 // Mongo URI garantida como string
-const mongoUri: string = process.env.MONGO_URI ?? process.env.MONGO_KEY ?? '';
+const mongoUri: string = process.env.MONGO_KEY ?? '';
 if (!mongoUri) {
   console.error("ERROR: MONGO_URI não está definida.");
   process.exit(1);
