@@ -197,6 +197,14 @@ export function attachConversationFlow(client: Client) {
         createdNewSession = true;
       }
 
+     // se sessão recém-criada, enviar prompt inicial
+      if (createdNewSession) {
+        const next = getNextPrompt(session);
+        session.state = next.state;
+        await safeLog(chatId, next.message);
+        return;
+      }
+
       // comando global "cancelar"
       if (/^cancelar$/i.test(text)) {
         sessions.delete(chatId);
@@ -253,10 +261,7 @@ export function attachConversationFlow(client: Client) {
             session.state = next.state;
             await safeLog(chatId, `Perfeito — vou te avisar ${n} dias antes. ✅\n\n${next.message}`);
             return;
-          } else {
-            await safeLog(chatId, "Hmm — esse número parece inválido. Por favor envie um número inteiro de dias (ex.: 3).");
-            return;
-          }
+          } 
         }
       }
 
@@ -275,13 +280,7 @@ export function attachConversationFlow(client: Client) {
         }
       }
 
-      // se sessão recém-criada, enviar prompt inicial
-      if (createdNewSession) {
-        const next = getNextPrompt(session);
-        session.state = next.state;
-        await safeLog(chatId, next.message);
-        return;
-      }
+
 
       // processar mídia (imagem)
       if (message.hasMedia) {
@@ -328,10 +327,6 @@ export function attachConversationFlow(client: Client) {
         }
       }
 
-      // fallback: reenviar prompt apropriado
-      const next = getNextPrompt(session);
-      session.state = next.state;
-      await safeLog(chatId, next.message);
     } catch (err) {
       // captura tudo no handler pra evitar unhandledRejection
       console.error("[conversation-flow] erro inesperado no handler de message:", err);
