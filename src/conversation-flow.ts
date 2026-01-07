@@ -183,25 +183,19 @@ export function attachConversationFlow(client: Client) {
   client.on("message", async (message: Message) => {
 
 
-    
-    // imprime estrutura completa (pode ajustar para JSON.stringify(msg, null, 2) se preferir)
-    console.log('--- nova mensagem recebida ---');
-    console.log('raw id:', message.id);
-    console.log('id._serialized:', message.id?._serialized);
-    console.log('from:', message.from);
-    console.log('author (group):', (message as any).author);
-    console.log('timestamp:', message.timestamp);
-    console.log('body:', message.body);
-    console.log('type:', message.type);
-    console.log('fromMe:', message.fromMe);
-    console.log('isStatus:', message.isStatus);
-
-    console.log('serialized:', JSON.stringify(message, Object.getOwnPropertyNames(message), 2));
-    console.log('-------------------------------');
 
     try {
       // log curto para depurar duplicatas (mesma message.id aparece duas vezes se duplicado)
       console.log('[conversation-flow] handler message firing', { pid: process.pid, from: message.from, id: message.id?.id ?? message.id });
+
+          
+    // imprime estrutura completa (pode ajustar para JSON.stringify(msg, null, 2) se preferir)
+    console.log('--- nova mensagem recebida ---');
+    console.log('from:', message.from);
+    console.log('author (group):', (message as any).author);
+    console.log('timestamp:', message.timestamp);
+    console.log('body:', message.body);
+    console.log('-------------------------------');
 
       const chatId = message.from;
       const text = (message.body || "").trim();
