@@ -25,6 +25,7 @@
     "@aws-sdk/s3-request-presigner": "^3.964.0",
     "@langchain/core": "^1.1.8",
     "@langchain/openai": "^1.2.0",
+    "axios": "^1.13.2",
     "dotenv": "^17.2.3",
     "fs-extra": "^11.3.3",
     "mongodb": "^7.0.0",
