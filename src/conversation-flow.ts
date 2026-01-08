@@ -266,44 +266,89 @@ export function attachConversationFlow(client: Client) {
         await safeLog(chatId, "Operação cancelada ✅");
         return;
       }
+    if (session.state === "CONFIRM") {
+      // checagem imediata ANTES de aguardar "sim" — avisa se o lembrete cair hoje/passado
+      const todayISO = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+      const validadeISO = session.draft.validade;
+      let reminderISO: string | null = null;
 
-      if (session.state === "CONFIRM") {
-        if (/^(não|nao|cancel(ar)?)$/i.test(text)) {
-          await safeLog(chatId, "Cancelado ❌\n\nTudo bem! Se precisar, é só me chamar 😊");
-          sessions.delete(chatId);
-          return;
-        }
-
-        if (/^sim$/i.test(text)) {
-          if (!session.draft.produto || !session.draft.validade || session.draft.diasAntes == null) {
-            const next = getNextPrompt(session);
-            session.state = next.state;
-            await safeLog(chatId, `Quase lá! 😄 Parece que ainda falta alguma informação.\n\n${next.message}`);
-            return;
-          }
-
-          const reminder = {
-            id: `rem-${Date.now()}`,
-            chatId,
-            produto: session.draft.produto!,
-            validade: session.draft.validade!,
-            diasAntes: session.draft.diasAntes!,
-            createdAt: new Date().toISOString(),
-          };
-
-          try {
-            await saveReminder(reminder);
-            await scheduleReminder(reminder);
-            await safeLog(chatId, "✅ Lembrete salvo com sucesso!\n\nPode ficar tranquilo(a), eu te aviso na hora certa 🕒📦");
-          } catch (err) {
-            console.error("Erro ao salvar/agendar lembrete:", err);
-            await safeLog(chatId, "Opa 😕 ocorreu um erro ao salvar o lembrete.\n\nPor favor, tente novamente mais tarde.");
-          } finally {
-            sessions.delete(chatId);
-          }
-          return;
-        }
+      const mm = (validadeISO || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (mm) {
+        const y = Number(mm[1]), mo = Number(mm[2]), d = Number(mm[3]);
+        const dt = new Date(Date.UTC(y, mo - 1, d));
+        const subtract = Number.isFinite(Number(session.draft.diasAntes)) ? Number(session.draft.diasAntes) : 0;
+        dt.setUTCDate(dt.getUTCDate() - subtract);
+        reminderISO = dt.toISOString().slice(0, 10);
       }
+
+      // Se a validade for hoje ou passada, avisa e pede nova foto (sem aguardar "sim")
+      if (validadeISO && validadeISO <= todayISO) {
+        session.state = "WAIT_IMAGE";
+        await safeLog(
+          chatId,
+          `⚠️ Atenção!\n\nA data de validade informada é *${formatDateBR(validadeISO)}* — que é hoje ou já passou.\n\n` +
+            `👉 Por favor, envie uma nova foto do rótulo com a data correta.`
+        );
+        return;
+      }
+
+      // Se o lembrete cairia hoje ou no passado, avisa e pede que o usuário informe outro "diasAntes"
+      if (reminderISO && reminderISO <= todayISO) {
+        session.state = "WAIT_DAYS";
+        await safeLog(
+          chatId,
+          `⚠️ Atenção!\n\nCom *${session.draft.diasAntes}* dias de antecedência, o lembrete cairia em *${formatDateBR(reminderISO)}*, ` +
+            `que é hoje ou já passou.\n\n` +
+            `👉 Por favor, responda com um novo número de *dias de antecedência* para que o lembrete seja agendado num dia futuro, ` +
+            `ou envie uma nova foto do rótulo se quiser alterar a validade.`
+        );
+        return;
+      }
+
+      // se não houve bloqueio, processa as respostas normais de confirmação
+      if (/^(não|nao|cancel(ar)?)$/i.test(text)) {
+        await safeLog(chatId, "Cancelado ❌\n\nTudo bem! Se precisar, é só me chamar 😊");
+        sessions.delete(chatId);
+        return;
+      }
+
+      if (/^sim$/i.test(text)) {
+        // validações de segurança: garantir campos
+        if (!session.draft.produto || !session.draft.validade || session.draft.diasAntes == null) {
+          const next = getNextPrompt(session);
+          session.state = next.state;
+          await safeLog(chatId, `Quase lá! 😄 Parece que ainda falta alguma informação.\n\n${next.message}`);
+          return;
+        }
+
+        // salvar e agendar
+        const reminder = {
+          id: `rem-${Date.now()}`,
+          chatId,
+          produto: session.draft.produto!,
+          validade: session.draft.validade!,
+          diasAntes: session.draft.diasAntes!,
+          createdAt: new Date().toISOString(),
+        };
+
+        try {
+          await saveReminder(reminder);
+          await scheduleReminder(reminder);
+          await safeLog(chatId, "✅ Lembrete salvo com sucesso!\n\nPode ficar tranquilo(a), eu te aviso na hora certa 🕒📦");
+        } catch (err) {
+          console.error("Erro ao salvar/agendar lembrete:", err);
+          await safeLog(chatId, "Opa 😕 ocorreu um erro ao salvar o lembrete.\n\nPor favor, tente novamente mais tarde.");
+        } finally {
+          sessions.delete(chatId);
+        }
+        return;
+      }
+
+    }
+
+
+
+
 
       // WAIT_DAYS: aceitar número direto
       if (text && session.state === "WAIT_DAYS") {
