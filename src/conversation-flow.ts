@@ -134,7 +134,7 @@ function getNextPrompt(session: Session): { state: State; message: string } {
     return {
       state: "WAIT_IMAGE",
       message:
-        "Olá! 👋 Eu sou o *Lembre Aí* 🕒📦\n\n" +
+        "Olá! 👋 Eu sou o *Lembra Ai* 🕒📦\n\n" +
         "Minha tarefa é te ajudar a lembrar da *validade dos seus produtos* para evitar desperdícios.\n\n" +
         "👉 Por favor, envie a *foto do rótulo com a data de validade* para que eu possa criar um lembrete para você.",
     };
