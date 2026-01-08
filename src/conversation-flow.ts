@@ -181,25 +181,34 @@ export function attachConversationFlow(client: Client) {
   clientRef = client;
 
   client.on("message", async (message: Message) => {
-
-
-
     try {
-      // log curto para depurar duplicatas (mesma message.id aparece duas vezes se duplicado)
-      console.log('[conversation-flow] handler message firing', { pid: process.pid, from: message.from, id: message.id?.id ?? message.id });
-
-          
-    // imprime estrutura completa (pode ajustar para JSON.stringify(msg, null, 2) se preferir)
-    console.log('--- nova mensagem recebida ---');
-    console.log('from:', message.from);
-    console.log('author (group):', (message as any).author);
-    console.log('timestamp:', message.timestamp);
-    console.log('body:', message.body);
-    console.log('-------------------------------');
-
+      // imprime estrutura completa (pode ajustar para JSON.stringify(msg, null, 2) se preferir)
+      console.log('--- nova mensagem recebida ---');
+      console.log('from:', message.from);
+      console.log('body:', message.body);
+      console.log('-------------------------------');
       const chatId = message.from;
       const text = (message.body || "").trim();
 
+      // --- FILTROS RÁPIDOS SIMPLES (cole aqui) ---
+      const msgId = (message.id && (message.id as any)._serialized) || (message.id as any) || `${Date.now()}_${Math.random()}`;
+
+      // 1) Ignorar mensagens enviadas pelo próprio cliente (fromMe)
+      if ((message as any).fromMe) {
+        console.log('[conversation-flow] ignorando mensagem fromMe', { id: msgId });
+        return;
+      }
+      // 2) Ignorar mensagens de status / tipo não-chat (defensivo: type e isStatus)
+      if ((message as any).isStatus || ((message as any).type && (message as any).type !== 'chat' && (message as any).type !== 'conversation')) {
+        console.log('[conversation-flow] ignorando mensagem não-chat', { id: msgId, type: (message as any).type });
+        return;
+      }
+      // 3) Ignorar eventos "vazios" sem texto e sem mídia
+      if (!text && !message.hasMedia) {
+        console.log('[conversation-flow] ignorando mensagem vazia sem mídia', { id: msgId });
+        return;
+      }
+      // --- fim filtros 
       // Garantir que a sessão exista (cria se necessário)
       let session = sessions.get(chatId);
       let createdNewSession = false;
