@@ -27,7 +27,7 @@ let clientRef: Client | null = null;
 /** Idempotência: garante que attachConversationFlow só registre handlers uma vez */
 let _conversationAttached = false;
 
-function formatDateBR(dateISO: string | null | undefined): string | null {
+export function formatDateBR(dateISO: string | null | undefined): string | null {
   if (!dateISO) return null;
   const match = dateISO.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;

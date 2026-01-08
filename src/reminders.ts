@@ -2,6 +2,7 @@
 import { MongoClient, Db, Collection } from "mongodb";
 import schedule from "node-schedule";
 import type { Client as WhatsAppClient } from "whatsapp-web.js";
+import { formatDateBR } from "./conversation-flow";
 
 const MONGO_KEY = process.env.MONGO_KEY 
 // defaults (evita o erro 'string | undefined')
@@ -108,6 +109,8 @@ export async function saveReminder(reminder: Reminder) {
 export async function scheduleReminder(reminder: Reminder) {
   const notifyDate = calcNotifyDate(reminder.validade, reminder.diasAntes);
 
+  
+
   if (notifyDate <= new Date()) {
     console.warn(
       `[REMINDER] Data já passou para ${reminder.produto} (${reminder.validade}) - notifyDate ${notifyDate.toISOString()}`
@@ -120,8 +123,9 @@ export async function scheduleReminder(reminder: Reminder) {
   const existing = (schedule.scheduledJobs as any)[reminder.id];
   if (existing) existing.cancel();
 
+  const dataFormatada = formatDateBR(reminder.validade)
   schedule.scheduleJob(reminder.id, notifyDate, async () => {
-    const text = `⏰ Lembrete: *${reminder.produto}* vence em ${reminder.validade}`;
+    const text = `⏰ Lembrete: *${reminder.produto}* vence em ${dataFormatada}`;
 
 
     try {
