@@ -191,24 +191,58 @@ export function attachConversationFlow(client: Client) {
       const text = (message.body || "").trim();
 
       // --- FILTROS RÁPIDOS SIMPLES (cole aqui) ---
-      const msgId = (message.id && (message.id as any)._serialized) || (message.id as any) || `${Date.now()}_${Math.random()}`;
+      const msgId =
+        (message.id && (message.id as any)._serialized) ||
+        (message.id as any) ||
+        `${Date.now()}_${Math.random()}`;
+
+      // Texto recebido (compatível com variações da lib)
+
+      // Tipos que queremos permitir (chat + mídias comuns)
+      const allowedTypes = [
+        'chat',
+        'conversation',
+        'image',
+        'video',
+        'audio',
+        'sticker',
+        'document',
+      ];
+
+      // Heurísticas leves para detectar mídia SEM chamar message.hasMedia()
+      // (você continua livre pra usar message.hasMedia() mais adiante no fluxo)
+      const msgType = (message as any).type;
+      const mimetype = (message as any).mimetype || (message as any)._data?.mimetype;
+      const hasMediaHints =
+        !!((message as any).mediaKey || (message as any).media || (message as any).isMedia || mimetype);
+      const typeIndicatesMedia =
+        typeof msgType === 'string' && ['image', 'video', 'audio', 'sticker', 'document'].includes(msgType);
 
       // 1) Ignorar mensagens enviadas pelo próprio cliente (fromMe)
       if ((message as any).fromMe) {
         console.log('[conversation-flow] ignorando mensagem fromMe', { id: msgId });
         return;
       }
+
       // 2) Ignorar mensagens de status / tipo não-chat (defensivo: type e isStatus)
-      if ((message as any).isStatus || ((message as any).type && (message as any).type !== 'chat' && (message as any).type !== 'conversation')) {
-        console.log('[conversation-flow] ignorando mensagem não-chat', { id: msgId, type: (message as any).type });
+      //    Agora permitimos tipos de mídia comuns (image, video, audio, sticker, document)
+      if ((message as any).isStatus || (msgType && !allowedTypes.includes(msgType))) {
+        console.log('[conversation-flow] ignorando mensagem não-chat', {
+          id: msgId,
+          type: msgType,
+        });
         return;
       }
-      // 3) Ignorar eventos "vazios" sem texto e sem mídia
-      if (!text && !message.hasMedia) {
+
+      // 3) Ignorar eventos "vazios" sem texto E sem indicação óbvia de mídia
+      const bodyEmpty = !text || (typeof text === 'string' && text.trim() === '');
+
+      if (bodyEmpty && !hasMediaHints && !typeIndicatesMedia) {
         console.log('[conversation-flow] ignorando mensagem vazia sem mídia', { id: msgId });
         return;
       }
-      // --- fim filtros 
+      // --- fim filtros ---
+
       // Garantir que a sessão exista (cria se necessário)
       let session = sessions.get(chatId);
       let createdNewSession = false;
